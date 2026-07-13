@@ -1,0 +1,170 @@
+'use strict';
+
+const path = require('path');
+const fs = require('fs-extra');
+
+async function run(a) {
+  const tsx = a.language === 'typescript' ? 'tsx' : 'js';
+  const ext = a.language === 'typescript' ? 'ts' : 'js';
+  const isTs = a.language === 'typescript';
+  const dir = path.join(a.targetDir, 'src/navigation');
+  const nav = a.navigation;
+
+  await fs.writeFile(
+    path.join(dir, `types.${ext}`),
+    `${
+      isTs
+        ? `export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+};
+
+export type MainStackParamList = {
+  Home: undefined;
+  Profile: undefined;
+  Settings: undefined;
+};
+
+export type RootStackParamList = {
+  Auth: undefined;
+  Main: undefined;
+  Splash: undefined;
+};
+`
+        : '// Route param types live here when using TypeScript.\n'
+    }`
+  );
+
+  if (nav.includes('auth')) {
+    await fs.writeFile(
+      path.join(dir, `AuthNavigator.${tsx}`),
+      `import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+${isTs ? "import type { AuthStackParamList } from './types';\n" : ''}
+// Replace these with real screens once generated (rn-enterprise generate screen Login --feature auth)
+import LoginScreen from '../${a.architecture === 'feature-based' ? 'features/auth/screens/LoginScreen' : 'presentation/screens/LoginScreen'}';
+import RegisterScreen from '../${a.architecture === 'feature-based' ? 'features/auth/screens/RegisterScreen' : 'presentation/screens/RegisterScreen'}';
+
+const Stack = createNativeStackNavigator${isTs ? '<AuthStackParamList>' : ''}();
+
+export default function AuthNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
+  );
+}
+`
+    );
+  }
+
+  if (nav.includes('main')) {
+    await fs.writeFile(
+      path.join(dir, `MainNavigator.${tsx}`),
+      `import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+${isTs ? "import type { MainStackParamList } from './types';\n" : ''}
+import HomeScreen from '../${a.architecture === 'feature-based' ? 'features/home/screens/HomeScreen' : 'presentation/screens/HomeScreen'}';
+import ProfileScreen from '../${a.architecture === 'feature-based' ? 'features/profile/screens/ProfileScreen' : 'presentation/screens/ProfileScreen'}';
+
+const Stack = createNativeStackNavigator${isTs ? '<MainStackParamList>' : ''}();
+
+export default function MainNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+`
+    );
+  }
+
+  const guardImport = nav.includes('guards') ? `import { useAuthGuard } from './useAuthGuard';\n` : '';
+  const guardHook = nav.includes('guards') ? `  const { isAuthenticated, isBootstrapping } = useAuthGuard();\n` : `  const isAuthenticated = false; // wire up to your auth state\n  const isBootstrapping = false;\n`;
+
+  if (nav.includes('root')) {
+    await fs.writeFile(
+      path.join(dir, `RootNavigator.${tsx}`),
+      `import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+${guardImport}import AuthNavigator from './AuthNavigator';
+import MainNavigator from './MainNavigator';
+import SplashScreen from '../${a.architecture === 'feature-based' ? 'features/home/screens/SplashScreen' : 'presentation/screens/SplashScreen'}';
+${nav.includes('deep-linking') ? "import { linking } from './linking';\n" : ''}
+export default function RootNavigator() {
+${guardHook}
+  if (isBootstrapping) return <SplashScreen />;
+
+  return (
+    <NavigationContainer${nav.includes('deep-linking') ? ' linking={linking}' : ''}>
+      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
+  );
+}
+`
+    );
+  }
+
+  if (nav.includes('guards')) {
+    await fs.writeFile(
+      path.join(dir, `useAuthGuard.${ext}`),
+      `import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+${isTs ? "import type { RootState } from '../store/store';\n" : ''}
+/**
+ * Route guard: gates navigation between Auth and Main stacks on token
+ * presence, and handles the initial "bootstrapping" splash window while
+ * we check for a persisted session.
+ */
+export function useAuthGuard() {
+  const accessToken = useSelector((state${isTs ? ': RootState' : ''}) => state.auth?.accessToken);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  useEffect(() => {
+    // Give redux-persist / storage a tick to rehydrate before deciding.
+    const timer = setTimeout(() => setIsBootstrapping(false), 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return { isAuthenticated: Boolean(accessToken), isBootstrapping };
+}
+`
+    );
+  }
+
+  if (nav.includes('deep-linking')) {
+    await fs.writeFile(
+      path.join(dir, `linking.${ext}`),
+      `${isTs ? "import type { LinkingOptions } from '@react-navigation/native';\nimport type { RootStackParamList } from './types';\n\n" : ''}/**
+ * Deep link + universal link config.
+ * iOS: also requires the Associated Domains entitlement (see ios_config_notes).
+ * Android: also requires an intent-filter in AndroidManifest.xml (see android_config_notes).
+ */
+export const linking${isTs ? ': LinkingOptions<RootStackParamList>' : ''} = {
+  prefixes: ['${a.projectName}://', 'https://${(a.website || 'example.com').replace(/^https?:\/\//, '')}'],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Home: 'home',
+          Profile: 'profile/:userId?',
+        },
+      },
+      Auth: {
+        screens: {
+          Login: 'login',
+        },
+      },
+    },
+  },
+};
+`
+    );
+  }
+}
+
+module.exports = { run };

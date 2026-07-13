@@ -1,0 +1,56 @@
+{
+  "name": "rn-enterprise-cli",
+  "version": "1.0.0",
+  "description": "Interactive CLI that scaffolds production-grade React Native enterprise projects (Firebase, Auth, Security, Navigation, State, Networking, UI Kit, DevOps).",
+  "license": "MIT",
+  "author": "YOUR NAME <you@example.com>",
+  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli/issues"
+  },
+  "keywords": [
+    "react-native",
+    "cli",
+    "scaffold",
+    "generator",
+    "firebase",
+    "enterprise",
+    "boilerplate",
+    "typescript"
+  ],
+  "bin": {
+    "rn-enterprise": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "fs-extra": "^11.2.0",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "validate-npm-package-name": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
