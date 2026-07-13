@@ -152,28 +152,64 @@ function scriptsFor(a) {
 }
 
 async function run(answers) {
+  const pkgPath = path.join(answers.targetDir, 'package.json');
+  let existingPkg = {};
+  if (await fs.pathExists(pkgPath)) {
+    existingPkg = await fs.readJson(pkgPath);
+  }
+
+  const targetDeps = depsFor(answers);
+  const targetDevDeps = devDepsFor(answers);
+  const targetScripts = scriptsFor(answers);
+
+  // Merge dependencies, keeping the template's versions for overlapping packages (like react, react-native, safe-area-context)
+  const mergedDeps = {
+    ...targetDeps,
+    ...(existingPkg.dependencies || {}),
+  };
+
+  const mergedDevDeps = {
+    ...targetDevDeps,
+    ...(existingPkg.devDependencies || {}),
+  };
+
+  const mergedScripts = {
+    ...(existingPkg.scripts || {}),
+    ...targetScripts,
+  };
+
   const pkg = {
+    ...existingPkg,
     name: answers.projectName,
     version: answers.version,
     private: true,
-    scripts: scriptsFor(answers),
-    dependencies: sortKeys(depsFor(answers)),
-    devDependencies: sortKeys(devDepsFor(answers)),
+    scripts: sortKeys(mergedScripts),
+    dependencies: sortKeys(mergedDeps),
+    devDependencies: sortKeys(mergedDevDeps),
   };
-  await fs.writeJson(path.join(answers.targetDir, 'package.json'), pkg, { spaces: 2 });
+
+  await fs.writeJson(pkgPath, pkg, { spaces: 2 });
 
   if (answers.language === 'typescript') {
-    await fs.writeJson(
-      path.join(answers.targetDir, 'tsconfig.json'),
-      {
-        extends: '@react-native/typescript-config/tsconfig.json',
-        compilerOptions: {
-          baseUrl: '.',
-          paths: { '@/*': ['src/*'] },
-        },
+    const tsconfigPath = path.join(answers.targetDir, 'tsconfig.json');
+    let existingTsconfig = {};
+    if (await fs.pathExists(tsconfigPath)) {
+      existingTsconfig = await fs.readJson(tsconfigPath);
+    }
+    const compilerOptions = {
+      ...(existingTsconfig.compilerOptions || {}),
+      baseUrl: '.',
+      paths: {
+        ...(existingTsconfig.compilerOptions?.paths || {}),
+        '@/*': ['src/*'],
       },
-      { spaces: 2 }
-    );
+    };
+    const tsconfig = {
+      ...existingTsconfig,
+      extends: existingTsconfig.extends || '@react-native/typescript-config/tsconfig.json',
+      compilerOptions,
+    };
+    await fs.writeJson(tsconfigPath, tsconfig, { spaces: 2 });
   }
 }
 

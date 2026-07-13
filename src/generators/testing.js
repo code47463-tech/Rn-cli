@@ -7,6 +7,24 @@ async function run(a) {
   const ext = a.language === 'typescript' ? 'ts' : 'js';
   const tsx = a.language === 'typescript' ? 'tsx' : 'js';
 
+  // Delete default App tests and configs to avoid duplication conflicts
+  const defaultJestConfigJs = path.join(a.targetDir, 'jest.config.js');
+  if (await fs.pathExists(defaultJestConfigJs)) {
+    await fs.remove(defaultJestConfigJs);
+  }
+  const defaultAppTest = path.join(a.targetDir, '__tests__/App.test.tsx');
+  if (await fs.pathExists(defaultAppTest)) {
+    await fs.remove(defaultAppTest);
+  }
+  const defaultAppTestJs = path.join(a.targetDir, '__tests__/App-test.js');
+  if (await fs.pathExists(defaultAppTestJs)) {
+    await fs.remove(defaultAppTestJs);
+  }
+  const defaultAppTestTs = path.join(a.targetDir, '__tests__/App-test.tsx');
+  if (await fs.pathExists(defaultAppTestTs)) {
+    await fs.remove(defaultAppTestTs);
+  }
+
   if (a.testing.includes('jest')) {
     await fs.writeJson(
       path.join(a.targetDir, 'jest.config.json'),

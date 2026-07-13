@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const ora = require('ora');
 const chalk = require('chalk');
+const { spawn } = require('child_process');
 const logger = require('./utils/logger');
 const { runWizard } = require('./prompts');
 const { presets } = require('./data/presets');
@@ -26,6 +27,7 @@ const devopsGen = require('./generators/devops');
 const testingGen = require('./generators/testing');
 const codeQualityGen = require('./generators/codeQuality');
 const docsGen = require('./generators/docs');
+const appEntry = require('./generators/appEntry');
 
 async function runCreate({ projectDir, yes, preset }) {
   logger.title('React Native Enterprise CLI');
@@ -54,6 +56,7 @@ async function runCreate({ projectDir, yes, preset }) {
   answers.targetDir = targetDir;
 
   const steps = [
+    ['Initializing React Native project', () => initReactNativeProject(answers)],
     ['Scaffolding folder structure', () => scaffold.run(answers)],
     ['Writing package.json & dependencies', () => packageJsonGen.run(answers)],
     ['Writing app.config.js and environment files', () => configFiles.run(answers)],
@@ -67,11 +70,13 @@ async function runCreate({ projectDir, yes, preset }) {
     ['Generating notifications', () => notificationsGen.run(answers)],
     ['Generating offline-first support', () => offlineGen.run(answers)],
     ['Generating localization & accessibility', () => localizationGen.run(answers)],
+    ['Rewriting App.tsx/App.js root entry', () => appEntry.run(answers)],
     ['Configuring Android & iOS native placeholders', () => nativeGen.run(answers)],
     ['Setting up testing tools', () => testingGen.run(answers)],
     ['Setting up code quality tooling', () => codeQualityGen.run(answers)],
     ['Setting up DevOps (git, CI, Fastlane)', () => devopsGen.run(answers)],
     ['Writing documentation', () => docsGen.run(answers)],
+    ['Installing packages', () => installPackages(answers)],
   ];
 
   for (const [label, fn] of steps) {
@@ -88,9 +93,93 @@ async function runCreate({ projectDir, yes, preset }) {
   logger.success(`\nProject "${answers.projectName}" generated at ${targetDir}`);
   logger.title('Next steps:');
   console.log(chalk.cyan(`  cd ${path.relative(process.cwd(), targetDir) || '.'}`));
-  console.log(chalk.cyan(`  ${answers.packageManager} install`));
   console.log(chalk.cyan(`  ${answers.packageManager === 'npm' ? 'npm run' : answers.packageManager} android   # or ios`));
   console.log(chalk.gray('\nRead GETTING_STARTED.md and SECURITY.md in the generated project for full details.\n'));
+}
+
+function initReactNativeProject(answers) {
+  return new Promise((resolve, reject) => {
+    const isWindows = process.platform === 'win32';
+    const cmd = isWindows ? 'npx.cmd' : 'npx';
+    const args = [
+      '@react-native-community/cli',
+      'init',
+      answers.projectName,
+      '--directory',
+      answers.targetDir,
+      '--skip-install',
+      '--skip-git-init',
+      '--package-name',
+      answers.androidPackage,
+    ];
+
+    const child = spawn(cmd, args, {
+      cwd: process.cwd(),
+      shell: isWindows,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`npx @react-native-community/cli init failed with code ${code}.\nError: ${stderr || stdout}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+function installPackages(answers) {
+  return new Promise((resolve, reject) => {
+    const pm = answers.packageManager || 'npm';
+    const isWindows = process.platform === 'win32';
+    const cmd = isWindows ? `${pm}.cmd` : pm;
+    const args = pm === 'yarn' ? [] : ['install'];
+
+    const child = spawn(cmd, args, {
+      cwd: answers.targetDir,
+      shell: isWindows,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${pm} install failed with code ${code}.\nError: ${stderr || stdout}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
 }
 
 module.exports = { runCreate };

@@ -125,6 +125,161 @@ And URL scheme \`${a.projectName}\` under Info > URL Types for custom-scheme dee
 Run \`cd ios && pod install\` after every native dependency change. Ensure \`use_frameworks!\` matches the config required by Firebase pods if you enabled Firebase.
 `
   );
+
+  // --- Automated Native Project Configurations ---
+
+  // 1. Android build.gradle (Google Services Classpath)
+  const buildGradlePath = path.join(a.targetDir, 'android/build.gradle');
+  if (await fs.pathExists(buildGradlePath)) {
+    let content = await fs.readFile(buildGradlePath, 'utf8');
+    if (a.useFirebase) {
+      if (!content.includes('com.google.gms:google-services')) {
+        content = content.replace(
+          /dependencies\s*\{/,
+          `dependencies {\n        classpath("com.google.gms:google-services:4.4.2")`
+        );
+      }
+    }
+    await fs.writeFile(buildGradlePath, content, 'utf8');
+  }
+
+  // 2. Android app/build.gradle (Google Services Plugin)
+  const appBuildGradlePath = path.join(a.targetDir, 'android/app/build.gradle');
+  if (await fs.pathExists(appBuildGradlePath)) {
+    let content = await fs.readFile(appBuildGradlePath, 'utf8');
+    if (a.useFirebase) {
+      if (!content.includes('com.google.gms.google-services')) {
+        content += '\napply plugin: "com.google.gms.google-services"\n';
+      }
+    }
+    await fs.writeFile(appBuildGradlePath, content, 'utf8');
+  }
+
+  // 3. AndroidManifest.xml (Permissions & Deep Linking)
+  const manifestPath = path.join(a.targetDir, 'android/app/src/main/AndroidManifest.xml');
+  if (await fs.pathExists(manifestPath)) {
+    let manifest = await fs.readFile(manifestPath, 'utf8');
+
+    // Add permissions
+    const androidPermissions = [];
+    if (a.notifications) {
+      androidPermissions.push('<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />');
+    }
+    if (a.authMethods.includes('biometric')) {
+      androidPermissions.push('<uses-permission android:name="android.permission.USE_BIOMETRIC" />');
+      androidPermissions.push('<uses-permission android:name="android.permission.USE_FINGERPRINT" />');
+    }
+    if (a.authMethods.includes('phone') || a.authMethods.includes('otp')) {
+      androidPermissions.push('<uses-permission android:name="android.permission.READ_PHONE_STATE" />');
+    }
+
+    if (androidPermissions.length > 0) {
+      const internetPermStr = '<uses-permission android:name="android.permission.INTERNET" />';
+      if (manifest.includes(internetPermStr)) {
+        manifest = manifest.replace(
+          internetPermStr,
+          `${internetPermStr}\n    ${androidPermissions.join('\n    ')}`
+        );
+      }
+    }
+
+    // Add Deep Linking intent-filter
+    if (a.navigation.includes('deep-linking')) {
+      const mainIntentFilterEnd = '</intent-filter>';
+      const scheme = a.projectName.toLowerCase();
+      const host = (a.website || 'example.com').replace(/^https?:\/\//, '');
+      const deepLinkFilter = `\n        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="${scheme}" />
+            <data android:scheme="https" android:host="${host}" />
+        </intent-filter>`;
+      
+      if (manifest.includes(mainIntentFilterEnd)) {
+        const index = manifest.indexOf(mainIntentFilterEnd);
+        manifest = manifest.slice(0, index + mainIntentFilterEnd.length) + deepLinkFilter + manifest.slice(index + mainIntentFilterEnd.length);
+      }
+    }
+
+    await fs.writeFile(manifestPath, manifest, 'utf8');
+  }
+
+  // 4. iOS Info.plist & AppDelegate
+  const iosRoot = path.join(a.targetDir, 'ios');
+  if (await fs.pathExists(iosRoot)) {
+    const subdirs = await fs.readdir(iosRoot);
+    let plistDir = null;
+    for (const subdir of subdirs) {
+      if (await fs.pathExists(path.join(iosRoot, subdir, 'Info.plist'))) {
+        plistDir = path.join(iosRoot, subdir);
+        break;
+      }
+    }
+
+    if (plistDir) {
+      // Modify Info.plist (Biometrics usage description + deep links URL scheme)
+      const infoPlistPath = path.join(plistDir, 'Info.plist');
+      let plist = await fs.readFile(infoPlistPath, 'utf8');
+      
+      if (a.authMethods.includes('biometric')) {
+        if (!plist.includes('NSFaceIDUsageDescription')) {
+          const insertIndex = plist.lastIndexOf('</dict>');
+          if (insertIndex !== -1) {
+            const biometricUsage = `\t<key>NSFaceIDUsageDescription</key>\n\t<string>We use Face ID for secure authentication.</string>\n`;
+            plist = plist.slice(0, insertIndex) + biometricUsage + plist.slice(insertIndex);
+          }
+        }
+      }
+
+      if (a.navigation.includes('deep-linking')) {
+        if (!plist.includes('CFBundleURLTypes')) {
+          const insertIndex = plist.lastIndexOf('</dict>');
+          if (insertIndex !== -1) {
+            const urlTypes = `\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>${a.projectName.toLowerCase()}</string>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>${a.projectName.toLowerCase()}</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n`;
+            plist = plist.slice(0, insertIndex) + urlTypes + plist.slice(insertIndex);
+          }
+        }
+      }
+      await fs.writeFile(infoPlistPath, plist, 'utf8');
+
+      // 5. AppDelegate.swift / AppDelegate.mm / AppDelegate.m (Firebase initialize)
+      if (a.useFirebase) {
+        const appDelegateSwiftPath = path.join(plistDir, 'AppDelegate.swift');
+        const appDelegateMmPath = path.join(plistDir, 'AppDelegate.mm');
+        const appDelegateMPath = path.join(plistDir, 'AppDelegate.m');
+
+        if (await fs.pathExists(appDelegateSwiftPath)) {
+          let content = await fs.readFile(appDelegateSwiftPath, 'utf8');
+          if (!content.includes('import FirebaseCore')) {
+            content = 'import FirebaseCore\n' + content;
+          }
+          if (!content.includes('FirebaseApp.configure()')) {
+            content = content.replace(
+              /return\s+true\s*\n\s*\}/,
+              `FirebaseApp.configure()\n    return true\n  }`
+            );
+          }
+          await fs.writeFile(appDelegateSwiftPath, content, 'utf8');
+        } else {
+          const objcPath = (await fs.pathExists(appDelegateMmPath)) ? appDelegateMmPath : ((await fs.pathExists(appDelegateMPath)) ? appDelegateMPath : null);
+          if (objcPath) {
+            let content = await fs.readFile(objcPath, 'utf8');
+            if (!content.includes('@import Firebase;')) {
+              content = '@import Firebase;\n' + content;
+            }
+            if (!content.includes('[FIRApp configure];')) {
+              const returnMatch = content.match(/return\s+\[super\s+application:/) || content.match(/return\s+YES;/);
+              if (returnMatch) {
+                content = content.replace(returnMatch[0], `[FIRApp configure];\n  ${returnMatch[0]}`);
+              }
+            }
+            await fs.writeFile(objcPath, content, 'utf8');
+          }
+        }
+      }
+    }
+  }
 }
 
 module.exports = { run };
