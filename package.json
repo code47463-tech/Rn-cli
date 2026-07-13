@@ -1,13 +1,13 @@
 {
-  "name": "rn-enterprise-cli",
+  "name": "@lakshit_desai/rn-enterprise-cli",
   "version": "1.0.0",
   "description": "Interactive CLI that scaffolds production-grade React Native enterprise projects (Firebase, Auth, Security, Navigation, State, Networking, UI Kit, DevOps).",
   "license": "MIT",
-  "author": "YOUR NAME <you@example.com>",
-  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli#readme",
+  "author": "Lakshit Desai code47463@gmail.com",
+  "homepage": "https://github.com/code47463-tech/Rn-cli#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli.git"
+    "url": "git@github.com:code47463-tech/Rn-cli.git"
   },
   "bugs": {
     "url": "https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli/issues"
@@ -23,7 +23,7 @@
     "typescript"
   ],
   "bin": {
-    "rn-enterprise": "./bin/cli.js"
+    "lakshit-rn-cli": "./bin/cli.js"
   },
   "files": [
     "bin",

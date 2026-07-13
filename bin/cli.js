@@ -11,7 +11,7 @@ const { runSelfUpdate } = require('../src/utils/selfUpdate');
 const program = new Command();
 
 program
-  .name('rn-enterprise')
+  .name('lakshit-rn-cli')
   .description('Production-grade React Native Enterprise CLI')
   .version(pkg.version);
 
