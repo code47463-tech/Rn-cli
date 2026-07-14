@@ -1,6 +1,6 @@
 {
   "name": "@lakshit_desai/rn-enterprise-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Interactive CLI that scaffolds production-grade React Native enterprise projects (Firebase, Auth, Security, Navigation, State, Networking, UI Kit, DevOps).",
   "license": "MIT",
   "author": "Lakshit Desai code47463@gmail.com",
@@ -10,7 +10,7 @@
     "url": "git@github.com:code47463-tech/Rn-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/rn-enterprise-cli/issues"
+    "url": "https://github.com/code47463-tech/Rn-cli/issues"
   },
   "keywords": [
     "react-native",

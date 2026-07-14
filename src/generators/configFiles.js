@@ -97,6 +97,15 @@ async function run(answers) {
   // .gitignore should never track real env files, only .example
   const gitignoreAdd = `\n# Environments (never commit real secrets)\n.env.development\n.env.qa\n.env.staging\n.env.production\n`;
   await fs.appendFile(path.join(targetDir, '.gitignore'), gitignoreAdd);
+
+  // react-native init writes app.json with name === displayName === projectName.
+  // Update displayName to what the user actually entered in the wizard.
+  const appJsonPath = path.join(targetDir, 'app.json');
+  if (await fs.pathExists(appJsonPath)) {
+    const appJson = await fs.readJson(appJsonPath);
+    appJson.displayName = answers.displayName;
+    await fs.writeJson(appJsonPath, appJson, { spaces: 2 });
+  }
 }
 
 module.exports = { run };
