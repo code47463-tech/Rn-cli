@@ -1,6 +1,6 @@
 {
   "name": "@lakshit_desai/rn-enterprise-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Interactive CLI that scaffolds production-grade React Native enterprise projects (Firebase, Auth, Security, Navigation, State, Networking, UI Kit, DevOps).",
   "license": "MIT",
   "author": "Lakshit Desai code47463@gmail.com",
